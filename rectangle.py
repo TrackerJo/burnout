@@ -32,7 +32,7 @@ class Rectangle:
              return False
          return self.topLeft().x <= point.x and self.topLeft().y <= point.y and self.bottomRight().x >= point.x and self.bottomRight().y >= point.y
 
-    def draw(self, cv2, frame, filled):
+    def draw(self, cv2, frame, filled=False):
         top_left = self.topLeft()
         bottom_right = self.bottomRight()
         

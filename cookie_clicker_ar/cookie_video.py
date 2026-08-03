@@ -7,12 +7,17 @@ import math
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-from cookie_clicker_ar.rectangle import Rectangle
-from cookie_clicker_ar.point import Point
-from cookie_clicker_ar.hand import Hand
+from rectangle import Rectangle
+from point import Point
+from hand import Hand
 
 MODEL_PATH = "hand_landmarker.task"
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+SHOW_LANDMARKS = False
+
+THUMB = 4
+POINTER_FINGER = 8
+MIDDLE_FINGER = 12
 
 def download_model_if_needed():
     """Download the hand landmark model once, if it's not already saved locally."""
@@ -39,28 +44,34 @@ def draw_hand_landmarks(img, hand_landmarks, width, height, hand_idx):
     """Draw a dot for every landmark, and a bigger highlighted dot on the index fingertip."""
     global hands
     while len(hands) <= hand_idx:
-        hands.append(Hand(Point(-1, -1), Point(-1, -1)))
+        hands.append(Hand(Point(-1, -1), Point(-1, -1),Point(-1, -1)))
     for id, lm in enumerate(hand_landmarks):
         cx, cy = int(lm.x * width), int(lm.y * height)
 
-        if id == 8: 
-            cv2.circle(img, (cx, cy), 15, (255, 0, 255), cv2.FILLED)
+        if id == POINTER_FINGER:
+            if SHOW_LANDMARKS: 
+                cv2.circle(img, (cx, cy), 15, (255, 0, 255), cv2.FILLED)
             hands[hand_idx].pointer = Point(cx, cy, lm.z)
-        elif id == 4:  
-            cv2.circle(img, (cx, cy), 3, (255, 255, 0), cv2.FILLED)
+        elif id == THUMB:  
+            if SHOW_LANDMARKS:
+                cv2.circle(img, (cx, cy), 3, (255, 255, 0), cv2.FILLED)
             hands[hand_idx].thumb = Point(cx, cy, lm.z)
+        elif id == MIDDLE_FINGER:
+            hands[hand_idx].middle = Point(cx, cy, lm.z)
         else:
-            cv2.circle(img, (cx, cy), 3, (0, 255, 0), cv2.FILLED)
+            if SHOW_LANDMARKS:
+                cv2.circle(img, (cx, cy), 3, (0, 255, 0), cv2.FILLED)
 
 
 def draw_cookies(img):
     global hands
     for hand in hands:
-        cv2.putText(img, f'Cookies: {int(hand.cookies)}', (hand.pointer.x, hand.pointer.y - 20),
+        cv2.putText(img, f'Cookies: {int(hand.cookies)}', (hand.middle.x, hand.middle.y - 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
 
 rectangle = Rectangle(Point(120, 250), 150, 150, "cookie.png")
 hands = []
+
 
 def main():
     global hands
@@ -90,7 +101,6 @@ def main():
             hands = hands[:len(result.hand_landmarks)]
             for hand_idx,hand_landmarks in enumerate(result.hand_landmarks):
                 draw_hand_landmarks(frame, hand_landmarks, width, height, hand_idx)
-        rectangle.draw(cv2, frame)
         clicked = False
         for hand in hands:
             dist = dist_between_points(hand.pointer, hand.thumb)

@@ -1,4 +1,4 @@
-from cookie_clicker_ar.point import Point
+from point import Point
 import numpy as np
 
 

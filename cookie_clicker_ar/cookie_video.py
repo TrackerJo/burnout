@@ -7,9 +7,9 @@ import math
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-from rectangle import Rectangle
-from point import Point
-from hand import Hand
+from cookie_clicker_ar.rectangle import Rectangle
+from cookie_clicker_ar.point import Point
+from cookie_clicker_ar.hand import Hand
 
 MODEL_PATH = "hand_landmarker.task"
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"

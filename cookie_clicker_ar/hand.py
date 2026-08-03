@@ -1,4 +1,4 @@
-from point import Point
+from cookie_clicker_ar.point import Point
 
 class Hand:
     thumb = Point(0, 0)

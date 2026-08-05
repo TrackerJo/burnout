@@ -5,7 +5,7 @@ class Hand:
     pointer = Point(0, 0)
     middle = Point(0, 0)
     min_dist = 10000
-    cookies = 0
+    team = 0
     onClick = any
     is_clicked = False
     
@@ -14,7 +14,6 @@ class Hand:
         self.pointer = pointer
         self.middle = middle
         self.min_dist = 10000
-        self.cookies = 0
         self.onClick = onClick
 
     def process(self):

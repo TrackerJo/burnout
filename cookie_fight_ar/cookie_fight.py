@@ -1,8 +1,11 @@
+import random
+
 import cv2
 import mediapipe as mp
 import time
 import urllib.request
 import os
+import math
 
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -19,6 +22,9 @@ SHOW_LANDMARKS = False
 THUMB = 4
 POINTER_FINGER = 8
 MIDDLE_FINGER = 12
+
+FRAME_WIDTH = 640
+FRAME_HEIGHT = 480
 
 def download_model_if_needed():
     """Download the hand landmark model once, if it's not already saved locally."""
@@ -61,37 +67,111 @@ def draw_hand_landmarks(img, hand_landmarks, width, height, hand_idx):
                 cv2.circle(img, (cx, cy), 3, (0, 255, 0), cv2.FILLED)
 
 
-def draw_cookies(img):
+def draw_points(img):
     global hands
+    global left_points
+    global right_points
     for hand in hands:
-        cv2.putText(img, f'Cookies: {int(hand.cookies)}', (hand.middle.x, hand.middle.y - 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1,  (255, 0, 255), 2)
-
-rectangle = Rectangle(Point(120, 250), 150, 150, "cookie.png")
+        cv2.putText(img, f'Points: {left_points if hand.team == 0 else int(right_points)}', (hand.middle.x, hand.middle.y - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1,  (255, 0, 255) if hand.team == 1 else (0, 255, 0), 2)
 hands = []
 cookie_objs = []
+frame_timestamp_ms = 0
+left_points = 0
+right_points = 0
 
-def draw_objects(img):
+def draw_objects(frame):
     global cookie_objs
     for obj in cookie_objs:
-        obj.draw(cv2, img)
+        obj.draw(cv2, frame)
+
+def move_objects():
+    global cookie_objs
+    global left_points
+    global right_points
+    cookies_rem = []
+    for obj in cookie_objs:
+
+        obj.center.y += obj.speed if not obj.flip else -obj.speed 
+        if obj.center.y + (obj.height / 2) > FRAME_HEIGHT:
+            cookies_rem.append(obj)
+            if obj.center.x > FRAME_WIDTH / 2:
+                min_x = 75
+                max_x =  FRAME_WIDTH / 2 + 75 / 2 
+                x = random.uniform(min_x, max_x)
+                cookie_objs.append(Rectangle(Point(x, 75), 75, 75, "cookie.png", 75))
+                for hand in hands:
+                    if hand.team == 0:
+                        left_points += 1
+            else:
+                min_x = FRAME_WIDTH / 2 + 75 / 2 
+                max_x = FRAME_WIDTH - 75 / 2
+                x = random.uniform(min_x, max_x)
+                cookie_objs.append(Rectangle(Point(x, 75), 75, 75, "cookie.png", 75))
+                for hand in hands:
+                    if hand.team == 1:
+                        right_points += 1
+        if obj.center.y - (obj.height / 2) <= 0:
+            obj.flip = False
+            if obj.center.x > FRAME_WIDTH / 2:
+                min_x = 75
+                max_x =  FRAME_WIDTH / 2 + 75 / 2 
+                x = random.uniform(min_x, max_x)
+                obj.center.x = x
+            else:
+                min_x = FRAME_WIDTH / 2 + 75 / 2 
+                max_x = FRAME_WIDTH - 75 / 2
+                x = random.uniform(min_x, max_x)
+                obj.center.x = x
+            obj.center.y = 75
+            obj.speed += 2
+    for obj in cookies_rem:
+        cookie_objs.remove(obj)
 
 def onClick(hand):
-    if rectangle.inRectangle(hand.pointer):
-        hand.cookies += 1
+    global cookie_objs
+
+    cookies_rem = []
+    if hand.team == 0:
+        for obj in cookie_objs:
+            if obj.inRectangle(hand.pointer):
+                obj.flip = True
+                break
+        for obj in cookies_rem:
+                cookie_objs.remove(obj)
+    else:
+        for obj in cookie_objs:
+            if obj.inRectangle(hand.pointer):
+                obj.flip = True
+                break
+        for obj in cookies_rem:
+                cookie_objs.remove(obj)
+    
+    
+
+def draw_screen(frame):
+    draw_objects(frame)
+    draw_points(frame)
+    cv2.imshow("Image", frame)
+
+def init():
+    min_x = FRAME_WIDTH / 2 + 75 / 2 
+    max_x = FRAME_WIDTH - 75 / 2
+    x = random.uniform(min_x, max_x)
+    cookie_objs.append(Rectangle(Point(x, 75), 75, 75, "cookie.png", 75))
 
 def main():
     global hands
+    global frame_timestamp_ms
     download_model_if_needed()
     detector = create_detector()
 
     cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
 
-    frame_timestamp_ms = 0
-    in_cookie = False
-
+    
+    init()
     while True:
         success, frame = cap.read()
         frame = cv2.flip(frame, 1)
@@ -102,22 +182,20 @@ def main():
 
         frame_timestamp_ms += 1
         result = detector.detect_for_video(mp_image, frame_timestamp_ms)
-
         height, width, _ = frame.shape
         if result.hand_landmarks:
             hands = hands[:len(result.hand_landmarks)]
             for hand_idx,hand_landmarks in enumerate(result.hand_landmarks):
                 draw_hand_landmarks(frame, hand_landmarks, width, height, hand_idx)
-        clicked = False
         for hand in hands:
             hand.process()
-            in_cookie = rectangle.inRectangle(hand.pointer)
-            clicked = False
-            if in_cookie:
-                clicked = clicked or hand.is_clicked
-        rectangle.draw(cv2, frame, clicked)
-        draw_cookies(frame)
-        cv2.imshow("Image", frame)
+            if hand.pointer.x < FRAME_WIDTH/2:
+                hand.team = 0
+            else:
+                hand.team = 1
+        move_objects()
+        
+        draw_screen(frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
